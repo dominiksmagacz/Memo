@@ -1,0 +1,571 @@
+using CSharp_MetaBots.ExcelMetabot;
+#pragma warning disable 1701
+using CSharp_MetaBots.General.RegExMetabot;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Data.Odbc;
+using System.Data.Sql;
+using System.Data.OleDb;
+using System.Data;
+using System.Diagnostics;
+using ING_Us_ugi_dla_Biznesu.ZRPA_.DS_Memomovement;
+
+
+namespace ING_Us_ugi_dla_Biznesu.ZRPA_.DS_Memomovement {
+	class Program {
+
+		static double takeBalanceIBH(string nrAccount, OleDbConnection Connection) {
+
+			OleDbCommand Command2 = new OleDbCommand("SELECT SUM([Cls Balance Pln]) FROM [page$] WHERE [GL acctSk Gnrl Ledger Acct Nr] LIKE '" + nrAccount + "' AND [GL Acct ClassSk Gl Acct Class Code] = '2'", Connection);
+			OleDbCommand Command3 = new OleDbCommand("SELECT SUM([Cls Balance Pln]) FROM [page$] WHERE [GL acctSk Gnrl Ledger Acct Nr] LIKE '" + nrAccount + "' AND [GL Acct ClassSk Gl Acct Class Code] = '1'", Connection);
+			var value1 = Command2.ExecuteScalar().ToString();
+			var value2 = Command3.ExecuteScalar().ToString();
+			double balancePLN = 0d;
+			string str1 = "";
+			string str2 = "";
+			float buff1 = 0.0f;
+			float buff2 = 0.0f;
+			str1 = value1.ToString();
+			str2 = value2.ToString();
+			Single.TryParse(str1, out buff1);
+			Single.TryParse(str2, out buff2);
+			balancePLN = buff2 - buff1;
+			return balancePLN;
+		}
+
+
+		static double GLtakeBalance(string nrAccount, OleDbConnection Connection, string company, string column) {
+
+			OleDbCommand Command2 = new OleDbCommand("SELECT SUM([Cls Balance Pln]) FROM [page$] WHERE [" + column + "] LIKE '%" + nrAccount + "%' AND [GL Acct ClassSk Gl Acct Class Code] = '2' AND [Pk Sbdr Src Code] LIKE '" + company + "'", Connection);
+			OleDbCommand Command3 = new OleDbCommand("SELECT SUM([Cls Balance Pln]) FROM [page$] WHERE [GL acctSk Gnrl Ledger Acct Nr] LIKE '%" + nrAccount + "%' AND [GL Acct ClassSk Gl Acct Class Code] = '1' AND [Pk Sbdr Src Code] LIKE '" + company + "'", Connection);
+			var value1 = Command2.ExecuteScalar().ToString();
+			var value2 = Command3.ExecuteScalar().ToString();
+			double balancePLN = 0d;
+			string str1 = "";
+			string str2 = "";
+			float buff1 = 0.0f;
+			float buff2 = 0.0f;
+			str1 = value1.ToString();
+			str2 = value2.ToString();
+			Single.TryParse(str1, out buff1);
+			Single.TryParse(str2, out buff2);
+			balancePLN = buff2 - buff1;
+			return balancePLN;
+		}
+		
+
+		static void bonusIBH(Excel excel, string date, string pathSpolki, string pathGL_All_IBH) {
+
+			excel.Show();
+			excel.Open($"{pathSpolki}bonus_IBH_" + date.Remove(0, 2) + "_v1.xlsx"); 	//Open goal file of bonus IBH
+			string myConnection = $"Provider=Microsoft.Jet.OLEDB.4.0;Data Source={pathGL_All_IBH}IBH_TEMP_{date}.xls;Extended Properties='Excel 8.0;HDR=YES;IMEX=1'";
+			OleDbConnection Connection = new OleDbConnection(myConnection);
+			Connection.Open();
+
+			int rowIBH = 2;
+			double balancePLN = 0d;
+			excel.ActivateSheet("bonus_uzg");
+			string nrAccount;
+			while (excel.GetValue(rowIBH, 1) != "") {
+				nrAccount = excel.GetValue(rowIBH, 1);
+				balancePLN = ((takeBalanceIBH(nrAccount, Connection)) * -1);
+				excel.ActivateSheet("bonus_uzg");
+				excel.SetValue(rowIBH, 7, balancePLN);
+				rowIBH++;
+			}
+
+			excel.Save();
+			excel.Quit();
+			Connection.Close();
+			Connection.Dispose();
+		}
+
+
+		static void ibhMajatek(Excel excel, string date, string pathSpolki, string pathGL_All_IBH) {
+
+			excel.Show();
+			excel.Open($"{pathSpolki}IBH_majatek_" + date + "_v1.xlsx"); 	//Open goal file of bonus IBH
+			excel.ActivateSheet("Template");
+			int colMajatek = excel.GetLastUsedColumn();
+			string myConnection = @"Provider=Microsoft.Jet.OLEDB.4.0;Data Source={pathGL_All_IBH}IBH_TEMP_{date}.xls;Extended Properties='Excel 8.0;HDR=YES;IMEX=1'";
+			OleDbConnection Connection = new OleDbConnection(myConnection);
+			Connection.Open();
+			int i = 0;
+			string nrAccount;
+			int rowIBH = 2;
+			double balancePLN = 0d;
+
+			for (i = 2; i<colMajatek -1; ) {
+				nrAccount = excel.GetValue(6, i);
+				balancePLN = takeBalanceIBH(nrAccount, Connection);
+				excel.ActivateSheet("Template");
+				excel.SetValue(25, i, balancePLN);
+				i++;
+			}
+
+			for (i = 2; i<colMajatek -1; ) {
+				nrAccount = excel.GetValue(27, i);
+				balancePLN = ((takeBalanceIBH(nrAccount, Connection)) * -1);
+				excel.ActivateSheet("Template");
+				excel.SetValue(42, i, balancePLN);
+				i++;
+			}
+
+			excel.Save();
+			excel.Quit();
+			Connection.Close();
+			Connection.Dispose();
+		}
+
+
+		static void bounsCF(Excel excel, string date, string pathSpolki, string pathGL_All_IBH) {
+			
+			excel.Show();
+			excel.Open($"{pathSpolki}bonus_CF_" + date.Remove(0, 2) + "_v1.xlsx"); 	//Open goal file of bonus IBH
+			excel.ActivateSheet("CF");
+			string myConnection = @"Provider=Microsoft.Jet.OLEDB.4.0;Data Source={pathGL_All_IBH}GL_TEMP_{date}.xls;Extended Properties='Excel 8.0;HDR=YES;IMEX=1'";
+			OleDbConnection Connection = new OleDbConnection(myConnection);
+			Connection.Open();
+			double balancePLN = 0d;
+			string column = "Pk Sbdr Gl Acct Nr";
+			int rowBonus = 2;
+			string company = "ING_CF";
+			string nrAccount;
+			while (excel.GetValue(rowBonus, 1) != "") {
+				nrAccount = excel.GetValue(rowBonus, 1);
+				balancePLN = ((GLtakeBalance(nrAccount, Connection, company, column)) * -1);
+				excel.ActivateSheet("CF");
+				excel.SetValue(rowBonus, 8, balancePLN);
+				rowBonus++;
+			}
+			excel.Save();
+			excel.Quit();
+			Connection.Close();
+			Connection.Dispose();
+		}
+
+
+		static void CFmajatek(Excel excel, string date, string pathSpolki, string pathGL_All_IBH) {
+
+			excel.Show();
+			excel.Open($"{pathSpolki}CF_majatek_" + date.Remove(0, 2) + "_v1.xlsx"); 	//Open goal file of bonus IBH
+			excel.ActivateSheet("Template");
+			int colMajatek = excel.GetLastUsedColumn();
+			string myConnection = @"Provider=Microsoft.Jet.OLEDB.4.0;Data Source={pathGL_All_IBH}GL_TEMP_{date}.xls;Extended Properties='Excel 8.0;HDR=YES;IMEX=1'";
+			OleDbConnection Connection = new OleDbConnection(myConnection);
+			Connection.Open();
+			int i = 0;
+			string column = "Pk Sbdr Gl Acct Nr";
+			string company = "ING_CF";
+			string nrAccount;
+			int rowCF = 2;
+			double balancePLN = 0d;
+			for (i = 2; i<colMajatek; ) {
+				nrAccount = excel.GetValue(6, i);
+				balancePLN = (GLtakeBalance(nrAccount, Connection, company, column)) * -1;
+				excel.ActivateSheet("Template");
+				excel.SetValue(25, i, balancePLN);
+				i++;
+			}
+
+			for (i = 2; i<colMajatek; ) {
+				nrAccount = excel.GetValue(27, i);
+				balancePLN = ((GLtakeBalance(nrAccount, Connection, company, column)) * -1);
+				excel.ActivateSheet("Template");
+				excel.SetValue(42, i, balancePLN);
+				i++;
+			}
+			excel.Save();
+			excel.Quit();
+			Connection.Close();
+			Connection.Dispose();
+		}
+
+
+		static void solverMajatek(Excel excel, string date, string pathSpolki, string pathGL_All_IBH) {
+
+			excel.Show();
+			excel.Open($"{pathSpolki}SOLVER_majatek_" + date.Remove(0, 2) + "_v1.xls"); 	//Open goal file of bonus IBH
+			excel.ActivateSheet("Template");
+			int colMajatek = excel.GetLastUsedColumn();
+			string myConnection = @"Provider=Microsoft.Jet.OLEDB.4.0;Data Source={pathGL_All_IBH}GL_TEMP_{date}.xls;Extended Properties='Excel 8.0;HDR=YES;IMEX=1'";
+			OleDbConnection Connection = new OleDbConnection(myConnection);
+			Connection.Open();
+			int i = 0;
+			string column = "Pk Sbdr Gl Acct Nr";
+			string company = "SOLVER";
+			string nrAccount;
+			int rowCF = 2;
+			double balancePLN = 0d;
+			for (i = 2; i<colMajatek; ) {
+				nrAccount = excel.GetValue(6, i);
+				nrAccount = RegEx.UseRegExp(nrAccount, @"(?<=\()(.*\n?)(?=\))", 1, 1);
+				balancePLN = (GLtakeBalance(nrAccount, Connection, company, column));
+				excel.ActivateSheet("Template");
+				excel.SetValue(25, i, balancePLN);
+				i++;
+			}
+
+			for (i = 2; i<colMajatek; ) {
+				nrAccount = excel.GetValue(27, i);
+				nrAccount = RegEx.UseRegExp(nrAccount, @"(?<=\()(.*\n?)(?=\))", 1, 1);
+				balancePLN = ((GLtakeBalance(nrAccount, Connection, company, column)) * -1);
+				excel.ActivateSheet("Template");
+				excel.SetValue(42, i, balancePLN);
+				i++;
+			}
+			excel.Save();
+			excel.Quit();
+			Connection.Close();
+			Connection.Dispose();
+		}
+
+
+		static void bonusLP(Excel excel, string date, string pathSpolki, string pathGL_All_IBH) {
+
+			excel.Show();
+			excel.Open($"{pathSpolki}bonus_LP_" + date.Remove(0, 2) + "_v1.xlsx"); 	//Open goal file of bonus IBH
+			excel.ActivateSheet("LP");
+			string myConnection = @"Provider=Microsoft.Jet.OLEDB.4.0;Data Source={pathGL_All_IBH}GL_TEMP_{date}.xls;Extended Properties='Excel 8.0;HDR=YES;IMEX=1'";
+			OleDbConnection Connection = new OleDbConnection(myConnection);
+			Connection.Open();
+			string column = "Pk Sbdr Gl Acct Nr";
+			double balancePLN = 0d;
+			int rowBonus = 2;
+			string company = "ING_LP";
+			string nrAccount;
+			while (excel.GetValue(rowBonus, 1) != "") {
+				nrAccount = excel.GetValue(rowBonus, 1);
+				balancePLN = ((GLtakeBalance(nrAccount, Connection, company, column)) * -1);
+				excel.ActivateSheet("LP");
+				excel.SetValue(rowBonus, 8, balancePLN);
+				rowBonus++;
+			}
+			excel.Save();
+			excel.Quit();
+			Connection.Close();
+			Connection.Dispose();
+		}
+		
+
+		static void leaseMajatek(Excel excel, string date, string pathSpolki, string pathGL_All_IBH) {
+
+			excel.Show();
+			excel.Open($"{pathSpolki}Lease_majatek_" + date.Remove(0, 2) + "_v1.xlsx"); 	//Open goal file of bonus IBH
+			excel.ActivateSheet("Template");
+			int colMajatek = excel.GetLastUsedColumn();
+			string myConnection = @"Provider=Microsoft.Jet.OLEDB.4.0;Data Source={pathGL_All_IBH}GL_TEMP_{date}.xls;Extended Properties='Excel 8.0;HDR=YES;IMEX=1'";
+			OleDbConnection Connection = new OleDbConnection(myConnection);
+			Connection.Open();
+			int i = 0;
+			string company = "ING_LP";
+			string nrAccount;
+			string column = "Pk Sbdr Gl Acct Nr";
+			int rowCF = 2;
+			double balancePLN = 0d;
+			for (i = 2; i<colMajatek; ) {
+				nrAccount = excel.GetValue(6, i);
+				if (nrAccount.Length>7) {
+					nrAccount = nrAccount.Substring(0, 7);
+					//					nrAccount = "0" + nrAccount;
+				}
+				balancePLN = (GLtakeBalance(nrAccount, Connection, company, column));
+				excel.ActivateSheet("Template");
+				excel.SetValue(25, i, balancePLN);
+				i++;
+			}
+			for (i = 2; i<colMajatek; ) {
+				nrAccount = excel.GetValue(27, i);
+				if (nrAccount.Length>7) {
+					nrAccount = nrAccount.Substring(0, 7);
+				}
+				balancePLN = ((GLtakeBalance(nrAccount, Connection, company, column)) * -1);
+				excel.ActivateSheet("Template");
+				excel.SetValue(42, i, balancePLN);
+				i++;
+			}
+			excel.Save();
+			excel.Quit();
+			Connection.Close();
+			Connection.Dispose();
+		}
+
+		
+		static void NUmajatek(Excel excel, string date, string pathSpolki, string pathGL_All_IBH) {
+
+			excel.Show();
+			excel.Open($"{pathSpolki}NU_majatek_" + date.Remove(0, 2) + "_v1.xlsx"); 	//Open goal file of bonus IBH
+			excel.ActivateSheet("Template");
+			int colMajatek = excel.GetLastUsedColumn();
+			string myConnection = @"Provider=Microsoft.Jet.OLEDB.4.0;Data Source={pathGL_All_IBH}GL_TEMP_{date}.xls;Extended Properties='Excel 8.0;HDR=YES;IMEX=1'";
+			OleDbConnection Connection = new OleDbConnection(myConnection);
+			Connection.Open();
+			int i = 0;
+			string column = "GL acctSk Gnrl Ledger Acct Nr";
+			string company = "NU";
+			string nrAccount;
+			int rowCF = 2;
+			double balancePLN = 0d;
+			for (i = 2; i<colMajatek; ) {
+				nrAccount = excel.GetValue(6, i);
+				nrAccount = RegEx.UseRegExp(nrAccount, @"(?<=\()(.*\n?)(?=\))", 1, 1);
+				balancePLN = (GLtakeBalance(nrAccount, Connection, company, column));
+				excel.ActivateSheet("Template");
+				excel.SetValue(25, i, balancePLN);
+				i++;
+			}
+
+			for (i = 2; i<colMajatek; ) {
+				nrAccount = excel.GetValue(27, i);
+				nrAccount = RegEx.UseRegExp(nrAccount, @"(?<=\()(.*\n?)(?=\))", 1, 1);
+				balancePLN = ((GLtakeBalance(nrAccount, Connection, company, column)) * -1);
+				excel.ActivateSheet("Template");
+				excel.SetValue(42, i, balancePLN);
+				i++;
+			}
+			excel.Save();
+			excel.Quit();
+			Connection.Close();
+			Connection.Dispose();
+		}
+
+		
+		static void amortyzacjaGL(Excel excel, string date, string majatekTamplatePath, string GLPath) {
+
+			excel.Show();
+			excel.Open($"{majatekTamplatePath}majatek_template_{date}_v1.xlsx"); 	//Open goal file of bonus IBH
+			excel.ActivateSheet("amortyzacja");
+			excel.SetValue(1, 1, "GMACT");
+			excel.SetValue(1, 2, "TUTUŁ");
+			excel.SetValue(1, 3, "GMCBAL");
+
+			var accounts = new List<string>();
+			string myConnection = $"Provider=Microsoft.Jet.OLEDB.4.0;Data Source={GLPath}GL bank {date}.xls;Extended Properties='Excel 8.0;HDR=YES;IMEX=1'";
+			OleDbConnection Connection = new OleDbConnection(myConnection);
+			Connection.Open();
+			double balancePLN = 0d;
+			OleDbCommand Command1 = new OleDbCommand("SELECT DISTINCT([GL acctSk Gnrl Ledger Acct Nr]) FROM [page$] WHERE [GL acctSk Gnrl Ledger Acct Nr] LIKE '755%'", Connection);
+			OleDbDataReader reader = Command1.ExecuteReader();
+			while (reader.Read()) {
+				accounts.Add(reader["GL acctSk Gnrl Ledger Acct Nr"].ToString());
+			}
+			int i = 2;
+			foreach (var account in accounts) {
+				System.Console.WriteLine(account);
+				balancePLN = (takeBalanceAmortyzacja(account, Connection));
+				string nameAccount = takeNameAccount(account, Connection);
+				excel.ActivateSheet("amortyzacja");
+				excel.SetValue(i, 1, account);
+				excel.SetValue(i, 2, nameAccount);
+				excel.SetValue(i, 3, balancePLN);
+				i++;
+			}
+
+			excel.ActivateSheet("Template");
+			int colMajatek = excel.GetLastUsedColumn();
+			string nrAccount;
+			string column = "GL acctSk Gnrl Ledger Acct Nr";
+			int rowCF = 2;
+			for (i = 2; i<colMajatek; ) {
+				nrAccount = excel.GetValue(6, i);
+				if (nrAccount.Length>7) {
+					nrAccount = nrAccount.Substring(0, 7);
+					//					nrAccount = "0" + nrAccount;
+				}
+				balancePLN = (takeBalanceIBH(nrAccount, Connection));
+				excel.ActivateSheet("Template");
+				excel.SetValue(31, i, balancePLN);
+				i++;
+			}
+			for (i = 2; i<colMajatek; ) {
+				nrAccount = excel.GetValue(33, i);
+				if (nrAccount.Length>7) {
+					nrAccount = nrAccount.Substring(0, 7);
+				}
+				balancePLN = ((takeBalanceIBH(nrAccount, Connection)) * -1);
+				excel.ActivateSheet("Template");
+				excel.SetValue(54, i, balancePLN);
+				i++;
+			}
+			System.Console.ReadKey();
+			excel.Save();
+			excel.Quit();
+			Connection.Close();
+			Connection.Dispose();
+		}
+		
+
+		static double takeBalanceAmortyzacja(string nrAccount, OleDbConnection Connection) {
+			
+			OleDbCommand Command2 = new OleDbCommand("SELECT SUM([Cls Balance Pln]) FROM [page$] WHERE [GL acctSk Gnrl Ledger Acct Nr] LIKE '" + nrAccount + "' AND [GL Acct ClassSk Gl Acct Class Code] = '2'", Connection);
+			OleDbCommand Command3 = new OleDbCommand("SELECT SUM([Cls Balance Pln]) FROM [page$] WHERE [GL acctSk Gnrl Ledger Acct Nr] LIKE '" + nrAccount + "' AND [GL Acct ClassSk Gl Acct Class Code] = '1'", Connection);
+			var value1 = Command2.ExecuteScalar().ToString();
+			var value2 = Command3.ExecuteScalar().ToString();
+			float buff1 = 0.0f;
+			float buff2 = 0.0f;
+			string str1 = value1.ToString();
+			string str2 = value2.ToString();
+			Single.TryParse(str1, out buff1);
+			Single.TryParse(str2, out buff2);
+			float balancePLN = buff2 - buff1;
+			return balancePLN;
+		}
+		
+
+		static string takeNameAccount(string nrAccount, OleDbConnection Connection) {
+			
+			OleDbCommand Command2 = new OleDbCommand("SELECT [GL acctGnrl Ledger Acct Dsc] FROM [page$] WHERE [GL acctSk Gnrl Ledger Acct Nr] LIKE '" + nrAccount + "'", Connection);
+			OleDbDataReader reader = Command2.ExecuteReader();
+			if (reader.Read()) {
+				string nameAccount = reader["GL acctGnrl Ledger Acct Dsc"].ToString();
+				return nameAccount;
+			}
+			else
+				return "brak nazwy";
+		}
+		
+
+		static void DictionarySetValue(Dictionary <string, string> myDict, int column, Excel excelMemo) {
+
+			foreach (var item in myDict) {
+				for (int j = 4; j<15; ) {
+					if (excelMemo.GetValue(j, 2) == item.Key) {
+						excelMemo.SetValue(j, column, item.Value);
+						j++;
+					}
+					else
+						j++;
+				}
+			}
+		}
+		
+
+		static void MajatekMemo(Excel exceSource, string date, Excel excelMemo, string fileName, string sheetName, string spolkiOtrzymanePath, string basicPath) {
+
+			Dictionary<string, string> DictSprzedaz = new Dictionary<string, string>();
+			Dictionary<string, string> DictZakupy = new Dictionary<string, string>();
+			Dictionary<string, string> DictAmortyzacja = new Dictionary<string, string>();
+			Dictionary<string, string> DictLikwidacja = new Dictionary<string, string>();
+			Dictionary<string, string> DictObroty = new Dictionary<string, string>();
+			exceSource.Show();
+			exceSource.Open($"{spolkiOtrzymanePath}{fileName}");
+			exceSource.ShowWorksheet("Memo_Movements");
+			exceSource.ActivateSheet("Memo_Movements");
+			int colMajatek = exceSource.GetLastUsedColumn();
+			exceSource.ShowColumn(1, 100);
+			for (int i = 2; i<colMajatek; ) {
+				if (exceSource.GetValue(5, i) != "") {
+					DictSprzedaz.Add(exceSource.GetValue(5, i), exceSource.GetValue(48, i));
+					DictZakupy.Add(exceSource.GetValue(5, i), exceSource.GetValue(49, i));
+					DictAmortyzacja.Add(exceSource.GetValue(5, i), exceSource.GetValue(50, i));
+					DictLikwidacja.Add(exceSource.GetValue(5, i), exceSource.GetValue(51, i));
+					DictObroty.Add(exceSource.GetValue(5, i), exceSource.GetValue(52, i));
+					i++;
+				}
+				else
+					i++;
+			}
+			excelMemo.Show();
+			excelMemo.DisplayAlerts(false);
+			excelMemo.GetExcelObject().Application.AskToUpdateLinks = false;
+			excelMemo.Open($"{basicPath}memo_" + date.Remove(0, 2) + "_v1.xlsx");
+			excelMemo.ActivateSheet(sheetName);
+			DictionarySetValue(DictSprzedaz, 6, excelMemo);
+			DictionarySetValue(DictZakupy, 5, excelMemo);
+			DictionarySetValue(DictAmortyzacja, 9, excelMemo);
+			DictionarySetValue(DictLikwidacja, 8, excelMemo);
+			DictionarySetValue(DictObroty, 7, excelMemo);
+			exceSource.HideWorksheet("Memo_Movements");
+			exceSource.Save();
+			exceSource.Quit();
+			excelMemo.Save();
+			excelMemo.Quit();
+		}
+
+		
+		static void Main(string[] args) {
+
+			Excel excel = new Excel();
+			excel.DisplayAlerts(false);
+			string choice = Microsoft.VisualBasic.Interaction.InputBox("Który etap procesu ma być realizowany? \nEtap I - wpisz 1 i naciśnij ENTER\nEtap II - wpisz 2 i naciśnij ENTER", "Który Etap", "");
+			string date = Microsoft.VisualBasic.Interaction.InputBox("Wpisz datę w formacie DDMMRRRR", "Our Reference", "");
+			string dateRemove = date.Remove(0, 2);
+			string basicPath = Microsoft.VisualBasic.Interaction.InputBox("Podaj lokalizację podstawową: \n(wzór: C:/Users/)", "Podaj Ścieżkę", "");
+			string spolkiWyslanePath = basicPath + "SPÓŁKI/Pliki wysłane/";
+			string GL_All_IBH_Path = basicPath + "SPÓŁKI/GL/";
+			string GL_All_IBH_PathToSave = GL_All_IBH_Path.Replace("/", @"\");
+			string GLPath = basicPath + "GL/";
+			string majatekTemplatePath = basicPath +"Pliki wysłane KsW/";
+			string spolkiOtrzymanePath = basicPath + "SPÓŁKI/Pliki otrzymane/";
+			string bonusDestPath = basicPath + "BONUS/";
+
+			System.Console.ReadKey();
+			try {
+				excel.Open($"{GL_All_IBH_Path}IBH {date}.xlsx");
+				excel.Show();
+				Thread.Sleep(1500);
+				excel.ActivateSheet("page");
+				excel.SetValue(1, 12, "GL acctSk Gnrl Ledger Acct Nr");
+				excel.SetValue(1, 10, "GL Acct ClassSk Gl Acct Class Code");
+				excel.SaveAs($"{GL_All_IBH_PathToSave}", $"IBH_TEMP_{date}", Excel.FileExtensionType.Xls);   //Poprawna forma zapisu
+				excel.Quit();
+				excel.Open($"{GL_All_IBH_Path}GL all _{date}.xlsx");
+				excel.Show();
+				Thread.Sleep(1500);
+				excel.ActivateSheet("page");
+				excel.SetValue(1, 4, "GL acctSk Gnrl Ledger Acct Nr");
+				excel.SetValue(1, 3, "GL Acct ClassSk Gl Acct Class Code");
+				excel.SaveAs($"{GL_All_IBH_PathToSave}", $"GL_TEMP_{date}", Excel.FileExtensionType.Xls);   //Poprawna forma zapisu
+				excel.Quit();
+				excel.Open($"{GLPath}GL bank {date}.xls");
+				excel.Show();
+				excel.SetValue(1, 4, "GL acctSk Gnrl Ledger Acct Nr");
+				excel.SetValue(1, 7, "GL Acct ClassSk Gl Acct Class Code");
+				excel.SetValue(1, 9, "GL acctGnrl Ledger Acct Dsc");
+				excel.Save();
+				excel.Quit();
+			}
+			catch (Exception e) {
+				Console.WriteLine(e);
+			}
+
+			if (choice == "1") {
+
+				bonusIBH(excel, date, spolkiWyslanePath, GL_All_IBH_Path);
+				ibhMajatek(excel, date, spolkiWyslanePath, GL_All_IBH_Path);
+				bounsCF(excel, date, spolkiWyslanePath, GL_All_IBH_Path);
+				CFmajatek(excel, date, spolkiWyslanePath, GL_All_IBH_Path);
+				solverMajatek(excel, date, spolkiWyslanePath, GL_All_IBH_Path);
+				bonusLP(excel, date, spolkiWyslanePath, GL_All_IBH_Path);
+				leaseMajatek(excel, date, spolkiWyslanePath, GL_All_IBH_Path);
+				NUmajatek(excel, date, spolkiWyslanePath, GL_All_IBH_Path);
+
+				amortyzacjaGL(excel, date, majatekTemplatePath, GLPath);
+			}
+
+			else if (choice == "2") {
+
+				Excel excel2 = new Excel();
+				MajatekMemo(excel, date, excel2, "IBH_majatek_" + date.Remove(0, 2) + "_v1.xlsx", "IBH", spolkiOtrzymanePath, basicPath);
+				MajatekMemo(excel, date, excel2, "CF_majatek_" + date.Remove(0, 2) + "_v1.xlsx", "ComFin", spolkiOtrzymanePath, basicPath);
+				MajatekMemo(excel, date, excel2, "SOLVER_majatek_" + date.Remove(0, 2) + "_v1.xls", "Solver", spolkiOtrzymanePath, basicPath);
+				MajatekMemo(excel, date, excel2, "UDB_majatek_" + date.Remove(0, 2) + "_v1.xlsx", "UdB", spolkiOtrzymanePath, basicPath);
+				MajatekMemo(excel, date, excel2, "Lease_majatek_" + date.Remove(0, 2) + "_v1.xlsx", "Lease", spolkiOtrzymanePath, basicPath);
+				MajatekMemo(excel, date, excel2, "majatek_template_" + date + "_v1.xlsx", "bsk -zmian. szczegóły ", spolkiOtrzymanePath, basicPath);
+
+				var nowa = new Nowa();
+				nowa.CopyRanges($"{spolkiOtrzymanePath}bonus_IBH_{dateRemove}_v1.xlsx", $"{bonusDestPath}! bonus przepływ ALL {dateRemove}.xlsx", "B2:H15", "B2:H15", "IBH");
+				nowa.CopyRanges($"{spolkiOtrzymanePath}bonus_CF_{dateRemove}_v1.xlsx", $"{bonusDestPath}! bonus przepływ ALL {dateRemove}.xlsx", "B2:H8", "B2:H8", "COMFIN");
+				nowa.CopyRanges($"{spolkiOtrzymanePath}bonus_UDB_{dateRemove}_v1.xlsx", $"{bonusDestPath}! bonus przepływ ALL {dateRemove}.xlsx", "B2:H2", "B2:H2", "UDB");
+				nowa.CopyRanges($"{spolkiOtrzymanePath}bonus_LP_{dateRemove}_v1.xlsx", $"{bonusDestPath}! bonus przepływ ALL {dateRemove}.xlsx", "C2:I8", "B2:H8", "LEASE");
+			}
+			else
+				System.Console.WriteLine("Nieprawidłowy wybór");
+		}
+	}
+}
+#pragma warning restore 1701
