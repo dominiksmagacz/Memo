@@ -1,0 +1,2 @@
+# Memo
+Automation of process
