@@ -1,0 +1,39 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using Excel = Microsoft.Office.Interop.Excel;
+
+namespace ING_Us_ugi_dla_Biznesu.ZRPA_.DS_Memomovement
+{
+		
+		public void CopyRanges(string srcPath, string destPath, string range1, string range2, string sheetName){
+		  
+			Excel.Application excelApplication = new Excel.Application();
+			excelApplication.DisplayAlerts = false;
+			Microsoft.Office.Interop.Excel.Worksheet srcworkSheet;
+			Microsoft.Office.Interop.Excel.Worksheet destworkSheet;
+			excelApplication.Visible = true;
+		    Excel.Workbook srcworkBook = excelApplication.Workbooks.Open(srcPath);
+		    srcworkSheet = (Microsoft.Office.Interop.Excel.Worksheet) srcworkBook.Worksheets.Item[1];
+		    Excel.Workbook destworkBook = excelApplication.Workbooks.Open(destPath,0,false);
+//		    destworkSheet = (Microsoft.Office.Interop.Excel.Worksheet) destworkBook.Worksheets.Item[1];
+		    destworkSheet = (Microsoft.Office.Interop.Excel.Worksheet) destworkBook.Sheets[sheetName];
+			
+
+		    Excel.Range frome = srcworkSheet.Range[range1];
+		    Excel.Range to = destworkSheet.Range[range2];
+
+		    // if you use 2 instances of excel, this will not work
+		    frome.Copy(to);
+
+//		    srcxlApp.Application.DisplayAlerts = false;
+//		    destxlApp.Application.DisplayAlerts = false;
+			destworkBook.Save();
+			srcworkBook.Save();
+		    excelApplication.Quit();
+		}
+    }
+}
