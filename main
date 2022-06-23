@@ -12,10 +12,9 @@ using System.Data.Sql;
 using System.Data.OleDb;
 using System.Data;
 using System.Diagnostics;
-using ING_Us_ugi_dla_Biznesu.ZRPA_.DS_Memomovement;
 
 
-namespace ING_Us_ugi_dla_Biznesu.ZRPA_.DS_Memomovement {
+namespace Memo{
 	class Program {
 
 		static double takeBalanceIBH(string nrAccount, OleDbConnection Connection) {
