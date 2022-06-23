@@ -6,8 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Excel = Microsoft.Office.Interop.Excel;
 
-namespace ING_Us_ugi_dla_Biznesu.ZRPA_.DS_Memomovement
-{
+namespace Memo{
 		
 		public void CopyRanges(string srcPath, string destPath, string range1, string range2, string sheetName){
 		  
